@@ -385,7 +385,7 @@ cleanup_server(struct iperf_test *test)
 int
 iperf_run_server(struct iperf_test *test)
 {
-    int result, s, streams_accepted;
+	int result, s;
 #if defined(HAVE_TCP_CONGESTION)
     int saved_errno;
 #endif /* HAVE_TCP_CONGESTION */
@@ -421,7 +421,7 @@ iperf_run_server(struct iperf_test *test)
     cpu_util(NULL);
 
     test->state = IPERF_START;
-    streams_accepted = 0;
+    test->streams_accepted = 0;
 
     while (test->state != IPERF_DONE) {
 
@@ -531,14 +531,14 @@ iperf_run_server(struct iperf_test *test)
 			    setnonblocking(s, 1);
 			}
 
-                        streams_accepted++;
+                        test->streams_accepted++;
                         if (test->on_new_stream)
                             test->on_new_stream(sp);
                     }
                     FD_CLR(test->prot_listener, &read_set);
                 }
 
-                if (streams_accepted == test->num_streams) {
+                if (test->streams_accepted == test->num_streams) {
                     if (test->protocol->id != Ptcp) {
                         FD_CLR(test->prot_listener, &test->read_set);
                         close(test->prot_listener);

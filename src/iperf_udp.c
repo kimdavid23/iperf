@@ -409,7 +409,13 @@ iperf_udp_accept(struct iperf_test *test)
     /*
      * Create a new "listening" socket to replace the one we were using before.
      */
-    test->prot_listener = netannounce(test->settings->domain, Pudp, test->bind_address, test->server_port);
+
+	 /*
+	 * increase the port number for each connection and send it to the client
+	 */
+	buf = test->server_port + test->streams_accepted + 1;
+	test->prot_listener = netannounce(test->settings->domain, Pudp, test->bind_address, buf);
+
     if (test->prot_listener < 0) {
         i_errno = IESTREAMLISTEN;
         return -1;
@@ -419,7 +425,6 @@ iperf_udp_accept(struct iperf_test *test)
     test->max_fd = (test->max_fd < test->prot_listener) ? test->prot_listener : test->max_fd;
 
     /* Let the client know we're ready "accept" another UDP "stream" */
-    buf = 987654321;		/* any content will work here */
     if (write(s, &buf, sizeof(buf)) < 0) {
         i_errno = IESTREAMWRITE;
         return -1;
@@ -543,6 +548,13 @@ iperf_udp_connect(struct iperf_test *test)
         i_errno = IESTREAMREAD;
         return -1;
     }
+
+	/*
+	* If the recived value is a valid port number, use it as the next connection port
+	*/
+	if (buf <= 65535) {
+		test->server_port = buf;
+	}
 
     return s;
 }

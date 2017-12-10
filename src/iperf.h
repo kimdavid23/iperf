@@ -296,6 +296,7 @@ struct iperf_test
     double remote_cpu_util[3];                     /* cpu utilization for the remote host/client - total, user, system */
 
     int       num_streams;                      /* total streams in the test (-P) */
+	int       streams_accepted;
 
     iperf_size_t bytes_sent;
     iperf_size_t blocks_sent;
