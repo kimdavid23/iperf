@@ -1,5 +1,5 @@
 /*
- * iperf, Copyright (c) 2014, 2017, The Regents of the University of
+ * iperf, Copyright (c) 2017-2020, The Regents of the University of
  * California, through Lawrence Berkeley National Laboratory (subject
  * to receipt of any required approvals from the U.S. Dept. of
  * Energy).  All rights reserved.
@@ -24,21 +24,42 @@
  * This code is distributed under a BSD style license, see the LICENSE
  * file for complete information.
  */
-#ifndef __NET_H
-#define __NET_H
 
-int timeout_connect(int s, const struct sockaddr *name, socklen_t namelen, int timeout);
-int netdial(int domain, int proto, const char *local, const char *bind_dev, int local_port, const char *server, int port, int timeout);
-int netannounce(int domain, int proto, const char *local, const char *bind_dev, int port);
-int Nread(int fd, char *buf, size_t count, int prot);
-int Nwrite(int fd, const char *buf, size_t count, int prot) /* __attribute__((hot)) */;
-int has_sendfile(void);
-int Nsendfile(int fromfd, int tofd, const char *buf, size_t count) /* __attribute__((hot)) */;
-int setnonblocking(int fd, int nonblocking);
-int getsockdomain(int sock);
-int parse_qos(const char *tos);
 
-#define NET_SOFTERROR -1
-#define NET_HARDERROR -2
+#include <assert.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
+#include <stdio.h>
+#include <string.h>
 
-#endif /* __NET_H */
+#include "iperf.h"
+#include "iperf_api.h"
+
+#include "version.h"
+
+#include "units.h"
+
+
+int
+main(int argc, char **argv)
+{
+    const char *ver;
+    struct iperf_test *test;
+    int sint, gint;
+
+    ver = iperf_get_iperf_version();
+    assert(strcmp(ver, IPERF_VERSION) == 0);
+
+    test = iperf_new_test();
+    assert(test != NULL);
+
+    iperf_defaults(test);
+
+    sint = 10;
+    iperf_set_test_connect_timeout(test, sint);
+    gint = iperf_get_test_connect_timeout(test);
+    assert(sint == gint);
+
+    return 0;
+}

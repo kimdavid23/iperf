@@ -1,5 +1,5 @@
 /*
- * iperf, Copyright (c) 2014-2018, The Regents of the University of
+ * iperf, Copyright (c) 2014-2019, The Regents of the University of
  * California, through Lawrence Berkeley National Laboratory (subject
  * to receipt of any required approvals from the U.S. Dept. of
  * Energy).  All rights reserved.
@@ -37,6 +37,7 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <limits.h>
 
 #ifdef HAVE_NETINET_SCTP_H
 #include <netinet/sctp.h>
@@ -56,21 +57,28 @@
 int
 iperf_sctp_recv(struct iperf_stream *sp)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     int r;
 
     r = Nread(sp->socket, sp->buffer, sp->settings->blksize, Psctp);
     if (r < 0)
         return r;
 
-    sp->result->bytes_received += r;
-    sp->result->bytes_received_this_interval += r;
+    /* Only count bytes received while we're in the correct state. */
+    if (sp->test->state == TEST_RUNNING) {
+	sp->result->bytes_received += r;
+	sp->result->bytes_received_this_interval += r;
+    }
+    else {
+	if (sp->test->debug)
+	    printf("Late receive, state = %d\n", sp->test->state);
+    }
 
     return r;
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -81,7 +89,7 @@ iperf_sctp_recv(struct iperf_stream *sp)
 int
 iperf_sctp_send(struct iperf_stream *sp)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     int r;
 
     r = Nwrite(sp->socket, sp->buffer, sp->settings->blksize, Psctp);
@@ -95,7 +103,7 @@ iperf_sctp_send(struct iperf_stream *sp)
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -107,7 +115,7 @@ iperf_sctp_send(struct iperf_stream *sp)
 int
 iperf_sctp_accept(struct iperf_test * test)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     int     s;
     signed char rbuf = ACCESS_DENIED;
     char    cookie[COOKIE_SIZE];
@@ -123,12 +131,14 @@ iperf_sctp_accept(struct iperf_test * test)
 
     if (Nread(s, cookie, COOKIE_SIZE, Psctp) < 0) {
         i_errno = IERECVCOOKIE;
+        close(s);
         return -1;
     }
 
-    if (strcmp(test->cookie, cookie) != 0) {
+    if (strncmp(test->cookie, cookie, COOKIE_SIZE) != 0) {
         if (Nwrite(s, (char*) &rbuf, sizeof(rbuf), Psctp) < 0) {
             i_errno = IESENDMESSAGE;
+            close(s);
             return -1;
         }
         close(s);
@@ -138,7 +148,7 @@ iperf_sctp_accept(struct iperf_test * test)
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -149,7 +159,7 @@ iperf_sctp_accept(struct iperf_test * test)
 int
 iperf_sctp_listen(struct iperf_test *test)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     struct addrinfo hints, *res;
     char portstr[6];
     int s, opt, saved_errno;
@@ -158,10 +168,19 @@ iperf_sctp_listen(struct iperf_test *test)
    
     snprintf(portstr, 6, "%d", test->server_port);
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = (test->settings->domain == AF_UNSPEC ? AF_INET6 : test->settings->domain);
+    /*
+     * If binding to the wildcard address with no explicit address
+     * family specified, then force us to get an AF_INET6 socket.
+     * More details in the comments in netanounce().
+     */
+    if (test->settings->domain == AF_UNSPEC && !test->bind_address) {
+        hints.ai_family = AF_INET6;
+    } else {
+        hints.ai_family = test->settings->domain;
+    }
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-    if (getaddrinfo(test->bind_address, portstr, &hints, &res) != 0) {
+    if ((gerror = getaddrinfo(test->bind_address, portstr, &hints, &res)) != 0) {
         i_errno = IESTREAMLISTEN;
         return -1;
     }
@@ -172,11 +191,47 @@ iperf_sctp_listen(struct iperf_test *test)
         return -1;
     }
 
+    if ((opt = test->settings->socket_bufsize)) {
+        int saved_errno;
+        if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &opt, sizeof(opt)) < 0) {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(res);
+            errno = saved_errno;
+            i_errno = IESETBUF;
+            return -1;
+        }
+        if (setsockopt(s, SOL_SOCKET, SO_SNDBUF, &opt, sizeof(opt)) < 0) {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(res);
+            errno = saved_errno;
+            i_errno = IESETBUF;
+            return -1;
+        }
+    }
+
+    if (test->bind_dev) {
+#if defined(SO_BINDTODEVICE)
+        if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+                       test->bind_dev, IFNAMSIZ) < 0)
+#endif // SO_BINDTODEVICE
+        {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(res);
+            i_errno = IEBINDDEV;
+            errno = saved_errno;
+            return -1;
+        }
+    }
+
 #if defined(IPV6_V6ONLY) && !defined(__OpenBSD__)
-    if (test->settings->domain == AF_UNSPEC || test->settings->domain == AF_INET6) {
+    if (res->ai_family == AF_INET6 && (test->settings->domain == AF_UNSPEC || 
+        test->settings->domain == AF_INET6)) {
         if (test->settings->domain == AF_UNSPEC)
             opt = 0;
-        else if (test->settings->domain == AF_INET6)
+        else
             opt = 1;
         if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, 
 		       (char *) &opt, sizeof(opt)) < 0) {
@@ -202,9 +257,11 @@ iperf_sctp_listen(struct iperf_test *test)
 
     /* servers must call sctp_bindx() _instead_ of bind() */
     if (!TAILQ_EMPTY(&test->xbind_addrs)) {
-        freeaddrinfo(res);
-        if (iperf_sctp_bindx(test, s, IPERF_SCTP_SERVER))
+        if (iperf_sctp_bindx(test, s, IPERF_SCTP_SERVER)) {
+            close(s);
+            freeaddrinfo(res);
             return -1;
+        }
     } else
     if (bind(s, (struct sockaddr *) res->ai_addr, res->ai_addrlen) < 0) {
         saved_errno = errno;
@@ -217,7 +274,7 @@ iperf_sctp_listen(struct iperf_test *test)
 
     freeaddrinfo(res);
 
-    if (listen(s, 5) < 0) {
+    if (listen(s, INT_MAX) < 0) {
         i_errno = IESTREAMLISTEN;
         return -1;
     }
@@ -228,7 +285,7 @@ iperf_sctp_listen(struct iperf_test *test)
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -239,16 +296,16 @@ iperf_sctp_listen(struct iperf_test *test)
 int
 iperf_sctp_connect(struct iperf_test *test)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     int s, opt, saved_errno;
     char portstr[6];
-    struct addrinfo hints, *local_res, *server_res;
+    struct addrinfo hints, *local_res = NULL, *server_res = NULL;
 
     if (test->bind_address) {
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = test->settings->domain;
         hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(test->bind_address, NULL, &hints, &local_res) != 0) {
+        if ((gerror = getaddrinfo(test->bind_address, NULL, &hints, &local_res)) != 0) {
             i_errno = IESTREAMCONNECT;
             return -1;
         }
@@ -258,7 +315,7 @@ iperf_sctp_connect(struct iperf_test *test)
     hints.ai_family = test->settings->domain;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof(portstr), "%d", test->server_port);
-    if (getaddrinfo(test->server_hostname, portstr, &hints, &server_res) != 0) {
+    if ((gerror = getaddrinfo(test->server_hostname, portstr, &hints, &server_res)) != 0) {
 	if (test->bind_address)
 	    freeaddrinfo(local_res);
         i_errno = IESTREAMCONNECT;
@@ -267,11 +324,46 @@ iperf_sctp_connect(struct iperf_test *test)
 
     s = socket(server_res->ai_family, SOCK_STREAM, IPPROTO_SCTP);
     if (s < 0) {
-	if (test->bind_address)
-	    freeaddrinfo(local_res);
+	freeaddrinfo(local_res);
 	freeaddrinfo(server_res);
         i_errno = IESTREAMCONNECT;
         return -1;
+    }
+
+    if ((opt = test->settings->socket_bufsize)) {
+        int saved_errno;
+        if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &opt, sizeof(opt)) < 0) {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(server_res);
+            errno = saved_errno;
+            i_errno = IESETBUF;
+            return -1;
+        }
+        if (setsockopt(s, SOL_SOCKET, SO_SNDBUF, &opt, sizeof(opt)) < 0) {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(server_res);
+            errno = saved_errno;
+            i_errno = IESETBUF;
+            return -1;
+        }
+    }
+
+    if (test->bind_dev) {
+#if defined(SO_BINDTODEVICE)
+        if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE,
+                       test->bind_dev, IFNAMSIZ) < 0)
+#endif // SO_BINDTODEVICE
+        {
+            saved_errno = errno;
+            close(s);
+            freeaddrinfo(local_res);
+            freeaddrinfo(server_res);
+            i_errno = IEBINDDEV;
+            errno = saved_errno;
+            return -1;
+        }
     }
 
     /*
@@ -415,8 +507,11 @@ iperf_sctp_connect(struct iperf_test *test)
 
     /* clients must call bind() followed by sctp_bindx() before connect() */
     if (!TAILQ_EMPTY(&test->xbind_addrs)) {
-        if (iperf_sctp_bindx(test, s, IPERF_SCTP_CLIENT))
+        if (iperf_sctp_bindx(test, s, IPERF_SCTP_CLIENT)) {
+            freeaddrinfo(server_res);
+            close(s);
             return -1;
+        }
     }
 
     /* TODO support sctp_connectx() to avoid heartbeating. */
@@ -428,12 +523,12 @@ iperf_sctp_connect(struct iperf_test *test)
         i_errno = IESTREAMCONNECT;
         return -1;
     }
-    freeaddrinfo(server_res);
 
     /* Send cookie for verification */
     if (Nwrite(s, test->cookie, COOKIE_SIZE, Psctp) < 0) {
 	saved_errno = errno;
 	close(s);
+	freeaddrinfo(server_res);
 	errno = saved_errno;
         i_errno = IESENDCOOKIE;
         return -1;
@@ -457,11 +552,12 @@ iperf_sctp_connect(struct iperf_test *test)
         return -1;
     }
 
+    freeaddrinfo(server_res);
     return s;
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -469,12 +565,12 @@ iperf_sctp_connect(struct iperf_test *test)
 int
 iperf_sctp_init(struct iperf_test *test)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     return 0;
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }
 
 
@@ -486,7 +582,7 @@ iperf_sctp_init(struct iperf_test *test)
 int
 iperf_sctp_bindx(struct iperf_test *test, int s, int is_server)
 {
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     struct addrinfo hints;
     char portstr[6];
     char *servname;
@@ -530,7 +626,7 @@ iperf_sctp_bindx(struct iperf_test *test, int s, int is_server)
         xbe0 = TAILQ_FIRST(&test->xbind_addrs);
         TAILQ_REMOVE(&test->xbind_addrs, xbe0, link);
 
-        if (getaddrinfo(xbe0->name, servname, &hints, &xbe0->ai) != 0) {
+        if ((gerror = getaddrinfo(xbe0->name, servname, &hints, &xbe0->ai)) != 0) {
             i_errno = IESETSCTPBINDX;
             retval = -1;
             goto out;
@@ -574,7 +670,7 @@ iperf_sctp_bindx(struct iperf_test *test, int s, int is_server)
     TAILQ_FOREACH(xbe, &test->xbind_addrs, link) {
         if (xbe->ai != NULL)
             freeaddrinfo(xbe->ai);
-        if (getaddrinfo(xbe->name, servname, &hints, &xbe->ai) != 0) {
+        if ((gerror = getaddrinfo(xbe->name, servname, &hints, &xbe->ai)) != 0) {
             i_errno = IESETSCTPBINDX;
             retval = -1;
             goto out;
@@ -635,5 +731,5 @@ out:
 #else
     i_errno = IENOSCTP;
     return -1;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
 }

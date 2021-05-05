@@ -1,4 +1,4 @@
-# iperf, Copyright (c) 2014-2018, The Regents of the University of
+# iperf, Copyright (c) 2014-2021, The Regents of the University of
 # California, through Lawrence Berkeley National Laboratory (subject
 # to receipt of any required approvals from the U.S. Dept. of
 # Energy).  All rights reserved.
@@ -24,8 +24,9 @@
 # file for complete information.
 
 # Initialize the autoconf system for the specified tool, version and mailing list
-AC_INIT(iperf, 3.4+, https://github.com/esnet/iperf, iperf, http://software.es.net/iperf/)
+AC_INIT(iperf, 3.9+, https://github.com/esnet/iperf, iperf, https://software.es.net/iperf/)
 m4_include([config/ax_check_openssl.m4])
+m4_include([config/iperf_config_static_bin.m4])
 AC_LANG(C)
 
 # Specify where the auxiliary files created by configure should go. The config
@@ -34,7 +35,10 @@ AC_CONFIG_AUX_DIR(config)
 
 
 # Initialize the automake system
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([foreign])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+LT_INIT
+
 AM_MAINTAINER_MODE
 AM_CONFIG_HEADER(src/iperf_config.h)
 
@@ -51,6 +55,11 @@ AC_PROG_LIBTOOL
 if test "x$GCC" = "xyes"; then
   CFLAGS="$CFLAGS -Wall"
 fi
+
+# Check if enable profiling
+AC_ARG_ENABLE([profiling],
+    AS_HELP_STRING([--enable-profiling], [Enable iperf3 profiling binary]))
+AM_CONDITIONAL([ENABLE_PROFILING], [test x$enable_profiling = xyes])
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -82,10 +91,33 @@ AC_C_CONST
 # Check for poll.h (it's in POSIX so everyone should have it?)
 AC_CHECK_HEADERS([poll.h])
 
+# SCTP.  Allow user to disable SCTP support with --without-sctp.
+# Otherwise we try to find whatever support is required.
+try_sctp=true
+AC_ARG_WITH([sctp],
+    [AS_HELP_STRING([--without-sctp],
+        [disable SCTP])],
+    [
+        case "$withval" in
+	y | ye | yes)
+	  ;;
+	n | no)
+	try_sctp=false
+	  ;;
+	*)
+	AC_MSG_ERROR([Invalid --with-sctp value])
+	  ;;
+	esac
+    ], [
+        try_sctp=true
+    ]
+)
+
 # Check for SCTP support
+if $try_sctp; then
 AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([netinet/sctp.h],
-		 AC_DEFINE([HAVE_SCTP], [1], [Have SCTP support.])
+		 AC_DEFINE([HAVE_SCTP_H], [1], [Have SCTP support.])
 		 AC_SEARCH_LIBS(sctp_bindx, [sctp])
 		 AC_CHECK_TYPES([struct sctp_assoc_value], [], [],
 				[[#include <netinet/sctp.h>]]),
@@ -94,6 +126,7 @@ AC_CHECK_HEADERS([netinet/sctp.h],
 #include <sys/socket.h>
 #endif
 ])
+fi
 
 AC_CHECK_HEADER([endian.h],
 		AC_DEFINE([HAVE_ENDIAN_H], [1], [Define to 1 if you have the <endian.h> header file.]),
@@ -107,15 +140,24 @@ if test "x$with_openssl" = "xno"; then
     AC_MSG_WARN( [Building without OpenSSL; disabling iperf_auth functionality.] )
 else
     # Check for OPENSSL support
+    havs_ssl=false
     AX_CHECK_OPENSSL(
-        [ AC_DEFINE([HAVE_SSL], [1], [OpenSSL Is Available]) ],
+        [ AC_DEFINE([HAVE_SSL], [1], [OpenSSL Is Available])
+          have_ssl=true ],
 	[ if test "x$with_openssl" != "x"; then
 	  AC_MSG_FAILURE([--with-openssl was given, but test for OpenSSL failed])
 	  fi ]
     )
-    LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
-    LIBS="$OPENSSL_LIBS $LIBS"
-    CPPFLAGS="$OPENSSL_INCLUDES $CPPFLAGS"
+    if $have_ssl; then
+        case $host in
+           *-*-cygwin)
+             CFLAGS="$CFLAGS -DNOCRYPT"
+             ;;
+        esac
+        LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+        LIBS="$OPENSSL_LIBS $LIBS"
+        CPPFLAGS="$OPENSSL_INCLUDES $CPPFLAGS"
+    fi
 fi
 
 # Check for TCP_CONGESTION sockopt (believed to be Linux and FreeBSD only)
@@ -182,5 +224,43 @@ if test "x$iperf3_cv_header_so_max_pacing_rate" = "xyes"; then
     AC_DEFINE([HAVE_SO_MAX_PACING_RATE], [1], [Have SO_MAX_PACING_RATE sockopt.])
 fi
 
+# Check for SO_BINDTODEVICE sockopt (believed to be Linux only)
+AC_CACHE_CHECK([SO_BINDTODEVICE socket option],
+[iperf3_cv_header_so_bindtodevice],
+AC_EGREP_CPP(yes,
+[#include <sys/socket.h>
+#ifdef SO_BINDTODEVICE
+  yes
+#endif
+],iperf3_cv_header_so_bindtodevice=yes,iperf3_cv_header_so_bindtodevice=no))
+if test "x$iperf3_cv_header_so_bindtodevice" = "xyes"; then
+    AC_DEFINE([HAVE_SO_BINDTODEVICE], [1], [Have SO_BINDTODEVICE sockopt.])
+fi
+
+# Check for IP DF support
+AC_CACHE_CHECK([IP_MTU_DISCOVER or IP_DONTFRAG socket option],
+[iperf3_cv_header_dontfragment],
+AC_EGREP_CPP(yes,
+[#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/in.h>
+#ifdef IP_MTU_DISCOVER
+  yes
+#endif
+#ifdef IP_DONTFRAG
+  yes
+#endif
+#ifdef IP_DONTFRAGMENT
+  yes
+#endif
+],iperf3_cv_header_dontfragment=yes,iperf3_cv_header_dontfragment=no))
+if test "x$iperf3_cv_header_dontfragment" = "xyes"; then
+    AC_DEFINE([HAVE_DONT_FRAGMENT], [1], [Have IP_MTU_DISCOVER/IP_DONTFRAG sockopt.])
+fi
+
+# Check if we need -lrt for clock_gettime
+AC_SEARCH_LIBS(clock_gettime, [rt posix4])
+# Check for clock_gettime support
+AC_CHECK_FUNCS([clock_gettime])
 
 AC_OUTPUT([Makefile src/Makefile src/version.h examples/Makefile iperf3.spec])

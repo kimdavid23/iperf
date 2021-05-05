@@ -1,4 +1,4 @@
-.TH IPERF3 1 "February 2018" ESnet "User Manuals"
+.TH IPERF3 1 "February 2021" ESnet "User Manuals"
 .SH NAME
 iperf3 \- perform network throughput tests
 .SH SYNOPSIS
@@ -117,6 +117,9 @@ set server port to listen on/connect to to \fIn\fR (default 5201)
 pause \fIn\fR seconds between periodic throughput reports;
 default is 1, use 0 to disable
 .TP
+.BR -I ", " --pidfile " \fIfile\fR"
+write a file with the process ID, most useful when running as a daemon.
+.TP
 .BR -F ", " --file " \fIname\fR"
 Use a file as the source (on the sender) or sink (on the receiver) of
 data, rather than just generating random data or throwing it away.
@@ -138,7 +141,11 @@ to a single CPU (as opposed to a set containing potentialy multiple
 CPUs).
 .TP
 .BR -B ", " --bind " \fIhost\fR"
-bind to a specific interface. If the host has multiple interfaces, it will use the first interface by default.
+bind to the specific interface associated with address \fIhost\fR.
+.BR --bind-dev " \fIdev\R"
+bind to the specified network interface.
+This option uses SO_BINDTODEVICE, and may require root permissions.
+(Available on Linux and possibly other systems.)
 .TP
 .BR -V ", " --verbose " "
 give more detailed output 
@@ -152,6 +159,22 @@ send output to a log file.
 .BR --forceflush " "
 force flushing output at every interval.
 Used to avoid buffering when sending output to pipe.
+.TP
+.BR --timestamps "[\fB=\fIformat\fR]"
+prepend a timestamp at the start of each output line.
+By default, timestamps have the format emitted by
+.BR ctime ( 1 ).
+Optionally, \fC=\fR followed by
+a format specification can be passed to customize the
+timestamps, see
+.BR strftime ( 3 ).
+If this optional format is given, the \fC=\fR must immediately
+follow the \fB--timestamps\fR option with no whitespace intervening.
+.TP
+.BR --rcv-timeout " \fI#\fR"
+set idle timeout for receiving data during active tests. The receiver
+will halt a test if no data is received from the sender for this
+number of ms (default to 12000 ms, or 2 minutes).
 .TP
 .BR -d ", " --debug " "
 emit debugging output.
@@ -171,11 +194,17 @@ run in server mode
 .BR -D ", " --daemon " "
 run the server in background as a daemon
 .TP
-.BR -I ", " --pidfile " \fIfile\fR"
-write a file with the process ID, most useful when running as a daemon.
-.TP
 .BR -1 ", " --one-off
 handle one client connection, then exit.
+.TP
+.BR --server-bitrate-limit " \fIn\fR[KMGT]"
+set a limit on the server side, which will cause a test to abort if
+the client specifies a test of more than \fIn\fR bits per second, or
+if the average data sent or received by the client (including all data
+streams) is greater than \fIn\fR bits per second.  The default limit
+is zero, which implies no limit.  The interval over which to average
+the data rate is 5 seconds by default, but can be specified by adding
+a '/' and a number to the bitrate specifier.
 .TP
 .BR --rsa-private-key-path " \fIfile\fR"
 path to the RSA private key (not password-protected) used to decrypt 
@@ -188,6 +217,10 @@ iperf tests (if built with OpenSSL support).
 The file is a comma separated list of usernames and password hashes;
 more information on the structure of the file can be found in the
 EXAMPLES section.
+.TP
+.BR --time-skew-threshold second " \fIseconds\fR"
+time skew threshold (in seconds) between the server and client
+during the authentication process.
 .SH "CLIENT SPECIFIC OPTIONS"
 .TP
 .BR -c ", " --client " \fIhost\fR"
@@ -209,7 +242,7 @@ connection establishment.
 Providing a shorter value may speed up detection of a down iperf3
 server.
 .TP
-.BR -b ", " --bitrate " \fIn\fR[KM]"
+.BR -b ", " --bitrate " \fIn\fR[KMGT]"
 set target bitrate to \fIn\fR bits/sec (default 1 Mbit/sec for UDP,
 unlimited for TCP/SCTP).
 If there are multiple streams (\-P flag), the throughput limit is applied
@@ -226,7 +259,7 @@ Compare with the \--fq-rate flag.
 This option replaces the \--bandwidth flag, which is now deprecated
 but (at least for now) still accepted.
 .TP
-.BR --pacing-timer " \fIn\fR[KMG]"
+.BR --pacing-timer " \fIn\fR[KMGT]"
 set pacing timer interval in microseconds (default 1000 microseconds,
 or 1 ms).
 This controls iperf3's internal pacing timer for the \-b/\--bitrate
@@ -236,7 +269,7 @@ Smaller values of the pacing timer parameter smooth out the traffic
 emitted by iperf3, but potentially at the cost of performance due to
 more frequent timer processing.
 .TP
-.BR --fq-rate " \fIn\fR[KM]"
+.BR --fq-rate " \fIn\fR[KMGT]"
 Set a rate to be used with fair-queueing based socket-level pacing,
 in bits per second.
 This pacing (if specified) will be in addition to any pacing due to
@@ -253,13 +286,13 @@ It is equivalent to specifying --fq-rate=0.
 .BR -t ", " --time " \fIn\fR"
 time in seconds to transmit for (default 10 secs)
 .TP
-.BR -n ", " --bytes " \fIn\fR[KM]"
+.BR -n ", " --bytes " \fIn\fR[KMGT]"
 number of bytes to transmit (instead of \-t)
 .TP
-.BR -k ", " --blockcount " \fIn\fR[KM]"
+.BR -k ", " --blockcount " \fIn\fR[KMGT]"
 number of blocks (packets) to transmit (instead of \-t or \-n)
 .TP
-.BR -l ", " --length " \fIn\fR[KM]"
+.BR -l ", " --length " \fIn\fR[KMGT]"
 length of buffer to read or write.  For TCP tests, the default value
 is 128KB.
 In the case of UDP, iperf3 tries to dynamically determine a reasonable
@@ -278,7 +311,11 @@ number of parallel client streams to run. Note that iperf3 is single threaded, s
 reverse the direction of a test, so that the server sends data to the
 client
 .TP
-.BR -w ", " --window " \fIn\fR[KM]"
+.BR --bidir
+test in both directions (normal and reverse), with both the client and
+server sending and receiving data simultaneously
+.TP
+.BR -w ", " --window " \fIn\fR[KMGT]"
 window size / socket buffer size (this gets sent to the server and used on that side too)
 .TP
 .BR -M ", " --set-mss " \fIn\fR"
@@ -333,6 +370,9 @@ period.
 .BR -T ", " --title " \fIstr\fR"
 Prefix every output line with this string.
 .TP
+.BR --extra-data " \fIstr\fR"
+Specify an extra data string field to be included in JSON output.
+.TP
 .BR -C ", " --congestion " \fIalgo\fR"
 Set the congestion control algorithm (Linux and FreeBSD only).  An
 older
@@ -348,10 +388,30 @@ If the client is run with \fB--json\fR, the server output is included
 in a JSON object; otherwise it is appended at the bottom of the
 human-readable output.
 .TP
+.BR --udp-counters-64bit
+Use 64-bit counters in UDP test packets.
+The use of this option can help prevent counter overflows during long
+or high-bitrate UDP tests.  Both client and server need to be running
+at least version 3.1 for this option to work.  It may become the
+default behavior at some point in the future.
+.TP
+.BR --repeating-payload
+Use repeating pattern in payload, instead of random bytes.
+The same payload is used in iperf2 (ASCII '0..9' repeating).
+It might help to test and reveal problems in networking gear with hardware
+compression (including some WiFi access points), where iperf2 and iperf3
+perform differently, just based on payload entropy.
+.TP
+.BR --dont-fragment
+Set the IPv4 Don't Fragment (DF) bit on outgoing packets.
+Only applicable to tests doing UDP over IPv4.
+.TP
 .BR --username " \fIusername\fR" 
 username to use for authentication to the iperf server (if built with
 OpenSSL support).
-The password will be prompted for interactively when the test is run.
+The password will be prompted for interactively when the test is run.  Note,
+the password to use can also be specified via the IPERF3_PASSWORD environment
+variable. If this variable is present, the password prompt will be skipped.
 .TP
 .BR --rsa-public-key-path " \fIfile\fR" 
 path to the RSA public key used to encrypt authentication credentials
@@ -359,10 +419,14 @@ path to the RSA public key used to encrypt authentication credentials
 
 .SH EXAMPLES
 .SS "Authentication - RSA Keypair"
-The authentication feature of requires an RSA public keypair.
+The authentication feature of iperf3 requires an RSA public keypair.
 The public key is used to encrypt the authentication token containing the 
 user credentials, while the private key is used to decrypt the authentication token.
-An example of a set of UNIX/Linux commands to generate correct keypair follows:
+The private key must be in PEM format and additionally must not have a
+password set.
+The public key must be in PEM format and use SubjectPrefixKeyInfo encoding.
+An example of a set of UNIX/Linux commands using OpenSSL
+to generate a correctly-formed keypair follows:
 .sp 1 
 .in +.5i
 > openssl genrsa -des3 -out private.pem 2048
@@ -407,8 +471,8 @@ mario,bf7a49a846d44b454a5d11e7acfaf13d138bbe0b7483aa3e050879700572709b
 .SH AUTHORS
 A list of the contributors to iperf3 can be found within the
 documentation located at
-\fChttp://software.es.net/iperf/dev.html#authors\fR.
+\fChttps://software.es.net/iperf/dev.html#authors\fR.
 
 .SH "SEE ALSO"
 libiperf(3),
-http://software.es.net/iperf
+https://software.es.net/iperf

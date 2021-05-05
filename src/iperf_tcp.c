@@ -1,5 +1,5 @@
 /*
- * iperf, Copyright (c) 2014-2018, The Regents of the University of
+ * iperf, Copyright (c) 2014-2021, The Regents of the University of
  * California, through Lawrence Berkeley National Laboratory (subject
  * to receipt of any required approvals from the U.S. Dept. of
  * Energy).  All rights reserved.
@@ -29,12 +29,14 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <limits.h>
 
 #include "iperf.h"
 #include "iperf_api.h"
@@ -60,8 +62,15 @@ iperf_tcp_recv(struct iperf_stream *sp)
     if (r < 0)
         return r;
 
-    sp->result->bytes_received += r;
-    sp->result->bytes_received_this_interval += r;
+    /* Only count bytes received while we're in the correct state. */
+    if (sp->test->state == TEST_RUNNING) {
+	sp->result->bytes_received += r;
+	sp->result->bytes_received_this_interval += r;
+    }
+    else {
+	if (sp->test->debug)
+	    printf("Late receive, state = %d\n", sp->test->state);
+    }
 
     return r;
 }
@@ -76,19 +85,24 @@ iperf_tcp_send(struct iperf_stream *sp)
 {
     int r;
 
+    if (!sp->pending_size)
+	sp->pending_size = sp->settings->blksize;
+
     if (sp->test->zerocopy)
-	r = Nsendfile(sp->buffer_fd, sp->socket, sp->buffer, sp->settings->blksize);
+	r = Nsendfile(sp->buffer_fd, sp->socket, sp->buffer, sp->pending_size);
     else
-	r = Nwrite(sp->socket, sp->buffer, sp->settings->blksize, Ptcp);
+	r = Nwrite(sp->socket, sp->buffer, sp->pending_size, Ptcp);
 
     if (r < 0)
         return r;
 
+    sp->pending_size -= r;
     sp->result->bytes_sent += r;
     sp->result->bytes_sent_this_interval += r;
 
     if (sp->test->debug)
-	printf("sent %d bytes of %d, total %" PRIu64 "\n", r, sp->settings->blksize, sp->result->bytes_sent);
+	printf("sent %d bytes of %d, pending %d, total %" PRIu64 "\n",
+	    r, sp->settings->blksize, sp->pending_size, sp->result->bytes_sent);
 
     return r;
 }
@@ -120,8 +134,7 @@ iperf_tcp_accept(struct iperf_test * test)
 
     if (strcmp(test->cookie, cookie) != 0) {
         if (Nwrite(s, (char*) &rbuf, sizeof(rbuf), Ptcp) < 0) {
-            i_errno = IESENDMESSAGE;
-            return -1;
+            iperf_err(test, "failed to send access denied from busy server to new connecting client, errno = %d\n", errno);
         }
         close(s);
     }
@@ -176,7 +189,7 @@ iperf_tcp_listen(struct iperf_test *test)
 	}
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
-        if (getaddrinfo(test->bind_address, portstr, &hints, &res) != 0) {
+        if ((gerror = getaddrinfo(test->bind_address, portstr, &hints, &res)) != 0) {
             i_errno = IESTREAMLISTEN;
             return -1;
         }
@@ -294,7 +307,7 @@ iperf_tcp_listen(struct iperf_test *test)
 
         freeaddrinfo(res);
 
-        if (listen(s, 5) < 0) {
+        if (listen(s, INT_MAX) < 0) {
             i_errno = IESTREAMLISTEN;
             return -1;
         }
@@ -367,7 +380,7 @@ iperf_tcp_connect(struct iperf_test *test)
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = test->settings->domain;
         hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(test->bind_address, NULL, &hints, &local_res) != 0) {
+        if ((gerror = getaddrinfo(test->bind_address, NULL, &hints, &local_res)) != 0) {
             i_errno = IESTREAMCONNECT;
             return -1;
         }
@@ -377,7 +390,7 @@ iperf_tcp_connect(struct iperf_test *test)
     hints.ai_family = test->settings->domain;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof(portstr), "%d", test->server_port);
-    if (getaddrinfo(test->server_hostname, portstr, &hints, &server_res) != 0) {
+    if ((gerror = getaddrinfo(test->server_hostname, portstr, &hints, &server_res)) != 0) {
 	if (test->bind_address)
 	    freeaddrinfo(local_res);
         i_errno = IESTREAMCONNECT;

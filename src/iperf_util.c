@@ -79,6 +79,27 @@ int readentropy(void *out, size_t outsize)
 }
 
 
+/*
+ * Fills buffer with repeating pattern (similar to pattern that used in iperf2)
+ */
+void fill_with_repeating_pattern(void *out, size_t outsize)
+{
+    size_t i;
+    int counter = 0;
+    char *buf = (char *)out;
+
+    if (!outsize) return;
+
+    for (i = 0; i < outsize; i++) {
+        buf[i] = (char)('0' + counter);
+        if (counter >= 9)
+            counter = 0;
+        else
+            counter++;
+    }
+}
+
+
 /* make_cookie
  *
  * Generate and return a cookie string
@@ -90,7 +111,7 @@ int readentropy(void *out, size_t outsize)
  */
 
 void
-make_cookie(char *cookie)
+make_cookie(const char *cookie)
 {
     unsigned char *out = (unsigned char*)cookie;
     size_t pos;
@@ -168,10 +189,10 @@ timeval_diff(struct timeval * tv0, struct timeval * tv1)
 void
 cpu_util(double pcpu[3])
 {
-    static struct timeval last;
+    static struct iperf_time last;
     static clock_t clast;
     static struct rusage rlast;
-    struct timeval temp;
+    struct iperf_time now, temp_time;
     clock_t ctemp;
     struct rusage rtemp;
     double timediff;
@@ -179,18 +200,19 @@ cpu_util(double pcpu[3])
     double systemdiff;
 
     if (pcpu == NULL) {
-        gettimeofday(&last, NULL);
+        iperf_time_now(&last);
         clast = clock();
 	getrusage(RUSAGE_SELF, &rlast);
         return;
     }
 
-    gettimeofday(&temp, NULL);
+    iperf_time_now(&now);
     ctemp = clock();
     getrusage(RUSAGE_SELF, &rtemp);
 
-    timediff = ((temp.tv_sec * 1000000.0 + temp.tv_usec) -
-                (last.tv_sec * 1000000.0 + last.tv_usec));
+    iperf_time_diff(&now, &last, &temp_time);
+    timediff = iperf_time_in_usecs(&temp_time);
+
     userdiff = ((rtemp.ru_utime.tv_sec * 1000000.0 + rtemp.ru_utime.tv_usec) -
                 (rlast.ru_utime.tv_sec * 1000000.0 + rlast.ru_utime.tv_usec));
     systemdiff = ((rtemp.ru_stime.tv_sec * 1000000.0 + rtemp.ru_stime.tv_usec) -
@@ -245,7 +267,7 @@ get_optional_features(void)
     numfeatures++;
 #endif /* HAVE_FLOWLABEL */
     
-#if defined(HAVE_SCTP)
+#if defined(HAVE_SCTP_H)
     if (numfeatures > 0) {
 	strncat(features, ", ", 
 		sizeof(features) - strlen(features) - 1);
@@ -253,7 +275,7 @@ get_optional_features(void)
     strncat(features, "SCTP", 
 	sizeof(features) - strlen(features) - 1);
     numfeatures++;
-#endif /* HAVE_SCTP */
+#endif /* HAVE_SCTP_H */
     
 #if defined(HAVE_TCP_CONGESTION)
     if (numfeatures > 0) {
@@ -294,6 +316,26 @@ get_optional_features(void)
 	sizeof(features) - strlen(features) - 1);
     numfeatures++;
 #endif /* HAVE_SSL */
+
+#if defined(HAVE_SO_BINDTODEVICE)
+    if (numfeatures > 0) {
+	strncat(features, ", ",
+		sizeof(features) - strlen(features) - 1);
+    }
+    strncat(features, "bind to device",
+	sizeof(features) - strlen(features) - 1);
+    numfeatures++;
+#endif /* HAVE_SO_BINDTODEVICE */
+
+#if defined(HAVE_DONT_FRAGMENT)
+    if (numfeatures > 0) {
+	strncat(features, ", ",
+		sizeof(features) - strlen(features) - 1);
+    }
+    strncat(features, "support IPv4 don't fragment",
+	sizeof(features) - strlen(features) - 1);
+    numfeatures++;
+#endif /* HAVE_DONT_FRAGMENT */
 
     if (numfeatures == 0) {
 	strncat(features, "None", 
@@ -380,7 +422,7 @@ iperf_json_printf(const char *format, ...)
 
 /* Debugging routine to dump out an fd_set. */
 void
-iperf_dump_fdset(FILE *fp, char *str, int nfds, fd_set *fds)
+iperf_dump_fdset(FILE *fp, const char *str, int nfds, fd_set *fds)
 {
     int fd;
     int comma;

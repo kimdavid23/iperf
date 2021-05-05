@@ -1,5 +1,5 @@
 /*
- * iperf, Copyright (c) 2014, 2017, The Regents of the University of
+ * iperf, Copyright (c) 2014-2018, The Regents of the University of
  * California, through Lawrence Berkeley National Laboratory (subject
  * to receipt of any required approvals from the U.S. Dept. of
  * Energy).  All rights reserved.
@@ -24,21 +24,26 @@
  * This code is distributed under a BSD style license, see the LICENSE
  * file for complete information.
  */
-#ifndef __NET_H
-#define __NET_H
+#ifndef __IPERF_TIME_H
+#define __IPERF_TIME_H
 
-int timeout_connect(int s, const struct sockaddr *name, socklen_t namelen, int timeout);
-int netdial(int domain, int proto, const char *local, const char *bind_dev, int local_port, const char *server, int port, int timeout);
-int netannounce(int domain, int proto, const char *local, const char *bind_dev, int port);
-int Nread(int fd, char *buf, size_t count, int prot);
-int Nwrite(int fd, const char *buf, size_t count, int prot) /* __attribute__((hot)) */;
-int has_sendfile(void);
-int Nsendfile(int fromfd, int tofd, const char *buf, size_t count) /* __attribute__((hot)) */;
-int setnonblocking(int fd, int nonblocking);
-int getsockdomain(int sock);
-int parse_qos(const char *tos);
+#include <stdint.h>
 
-#define NET_SOFTERROR -1
-#define NET_HARDERROR -2
+struct iperf_time {
+    uint32_t secs;
+    uint32_t usecs;
+};
 
-#endif /* __NET_H */
+int iperf_time_now(struct iperf_time *time1);
+
+void iperf_time_add_usecs(struct iperf_time *time1, uint64_t usecs);
+
+int iperf_time_compare(struct iperf_time *time1, struct iperf_time *time2);
+
+int iperf_time_diff(struct iperf_time *time1, struct iperf_time *time2, struct iperf_time *diff);
+
+uint64_t iperf_time_in_usecs(struct iperf_time *time);
+
+double iperf_time_in_secs(struct iperf_time *time);
+
+#endif
