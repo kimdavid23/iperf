@@ -467,6 +467,7 @@ iperf_run_server(struct iperf_test *test)
     test->state = IPERF_START;
     send_streams_accepted = 0;
     rec_streams_accepted = 0;
+    test->streams_accepted = 0;
     rcv_timeout_us = (test->settings->rcv_timeout.secs * SEC_TO_US) + test->settings->rcv_timeout.usecs;
 
     while (test->state != IPERF_DONE) {
@@ -645,9 +646,11 @@ iperf_run_server(struct iperf_test *test)
                         if (rec_streams_accepted != streams_to_rec) {
                             flag = 0;
                             ++rec_streams_accepted;
+                            ++test->streams_accepted;
                         } else if (send_streams_accepted != streams_to_send) {
                             flag = 1;
                             ++send_streams_accepted;
+                            ++test->streams_accepted;
                         }
 
                         if (flag != -1) {
