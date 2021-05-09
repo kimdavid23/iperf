@@ -267,6 +267,7 @@ struct iperf_test
     int       bind_port;                        /* --cport option */
     int       server_port;
     int       omit;                             /* duration of omit period (-O flag) */
+	int       wait;                             /* duration of wait period (-W flag) */
     int       duration;                         /* total duration of test (-t flag) */
     char     *diskfile_name;			/* -F option */
     int       affinity, server_affinity;	/* -A option */
@@ -321,11 +322,13 @@ struct iperf_test
 
     /* Interval related members */ 
     int       omitting;
+    int       waiting;
     double    stats_interval;
     double    reporter_interval;
     void      (*stats_callback) (struct iperf_test *);
     void      (*reporter_callback) (struct iperf_test *);
     Timer     *omit_timer;
+    Timer     *wait_timer;
     Timer     *timer;
     int        done;
     Timer     *stats_timer;

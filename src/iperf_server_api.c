@@ -324,6 +324,51 @@ create_server_timers(struct iperf_test * test)
 }
 
 static void
+server_wait_timer_proc(TimerClientData client_data, struct iperf_time *nowP)
+{   
+    struct iperf_test *test = client_data.p;
+    struct iperf_time now;
+    struct iperf_stream *sp;
+
+    test->wait_timer = NULL;
+    test->waiting = 0;
+
+    if (test->verbose && !test->json_output && test->reporter_interval == 0)
+	iperf_printf(test, "%s", report_wait_done);
+
+    iperf_time_now(&now);
+    SLIST_FOREACH(sp, &test->streams, streams) {
+	sp->result->start_time = sp->result->start_time_fixed = now;
+    }
+}
+
+static int
+create_server_wait_timer(struct iperf_test * test)
+{
+    struct iperf_time now;
+    TimerClientData cd; 
+
+    if (test->wait == 0) {
+	test->wait_timer = NULL;
+	test->waiting = 0;
+    } else {
+	if (iperf_time_now(&now) < 0) {
+	    i_errno = IEINITTEST;
+	    return -1; 
+	}
+	test->waiting = 1;
+	cd.p = test;
+	test->wait_timer = tmr_create(&now, server_wait_timer_proc, cd, test->wait * SEC_TO_US, 0); 
+	if (test->wait_timer == NULL) {
+	    i_errno = IEINITTEST;
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+static void
 server_omit_timer_proc(TimerClientData client_data, struct iperf_time *nowP)
 {   
     struct iperf_test *test = client_data.p;
@@ -735,6 +780,10 @@ iperf_run_server(struct iperf_test *test)
 			cleanup_server(test);
                         return -1;
 		    }
+		    if (create_server_wait_timer(test) < 0) {
+			cleanup_server(test);
+                        return -1;
+		    }
 		    if (create_server_omit_timer(test) < 0) {
 			cleanup_server(test);
                         return -1;
@@ -752,6 +801,12 @@ iperf_run_server(struct iperf_test *test)
             }
 
             if (test->state == TEST_RUNNING) {
+
+			    // if (test->debug) {
+					// printf("Waiting 10 sec ...\n");
+			    // }
+				// sleep(10);
+
                 if (test->mode == BIDIRECTIONAL) {
                     if (iperf_recv(test, &read_set) < 0) {
                         cleanup_server(test);

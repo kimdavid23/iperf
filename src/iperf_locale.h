@@ -59,6 +59,7 @@ extern const char report_authentication_succeeded[] ;
 extern const char report_authentication_failed[] ;
 extern const char report_window[] ;
 extern const char report_autotune[] ;
+extern const char report_wait_done[] ;
 extern const char report_omit_done[] ;
 extern const char report_diskfile[] ;
 extern const char report_done[] ;
