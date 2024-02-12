@@ -5467,7 +5467,7 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
     long long num = 0;
 
     FILE *f1 = fopen(fileName, "r");
-    for (int i = 0; i < num_of_files; i++)
+    for (long long i = 0; i < num_of_files; i++)
     {
         dup_remove_init();
         while (fscanf(f1, "%s", tmpname) != EOF)
@@ -5480,7 +5480,7 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
             }
         }
         char snum[5];
-        sprintf(snum, "%d", (int) i);
+        sprintf(snum, "%lld", i);
         char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
         strcpy(tempFileName, outFileName);
         strcat(tempFileName, snum);
@@ -5488,8 +5488,8 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
 
         qsort(dup_remove_strbuf, num, sizeof(const char *), dup_remove_compare);
 
-        for (long long i = 0; i < num; i++)
-            fprintf(f2, "%s\n", dup_remove_strbuf[i]);
+        for (long long j = 0; j < num; j++)
+            fprintf(f2, "%s\n", dup_remove_strbuf[j]);
         fclose(f2);
         dup_remove_free_resources(&num);
     }
@@ -5529,7 +5529,7 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
                 strcat(tempFileName1, snum1);
 
                 char snum3[5];
-                sprintf(snum3, "%d", i);
+                sprintf(snum3, "%lld", i);
                 char tempFileName2[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName2, "TEMP_SORTED_FILE");
                 strcat(tempFileName2, snum3);
