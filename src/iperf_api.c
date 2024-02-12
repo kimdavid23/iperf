@@ -5515,12 +5515,12 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             long long temp = (num_of_files) / 2;
             long long temp2 = num_of_files;
             num_of_files = (num_of_files + 1) / 2;
-            for (int i = 0; i < temp; i++)
+            for (long long i = 0; i < temp; i++)
             {
                 char snum[5];
-                sprintf(snum, "%d", 2 * i);
+                sprintf(snum, "%lld", 2 * i);
                 char snum1[5];  
-                sprintf(snum1, "%d", 2 * i + 1);
+                sprintf(snum1, "%lld", 2 * i + 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
