@@ -57,7 +57,7 @@ static int run(struct iperf_test *test);
 int
 main(int argc, char **argv)
 {
-    printf ("Iperf3 mod for MS ExpressRoute verion 1.0\n")
+    printf ("Iperf3 mod for MS ExpressRoute verion 1.0\n");
 
     struct iperf_test *test;
 
