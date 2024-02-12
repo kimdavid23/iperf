@@ -5060,70 +5060,13 @@ stop_diagnostic(struct iperf_stream *sp)
             stat(sp->udp_outoforderpkt_diagnostic_fname, &st);
             ooosize = st.st_size;
 
+            printf ("hello world\n");
+
             if (ooosize != 0) {
-                remove_duplicated_lines(absoluteDirLost, absoluteDirOOO, absoluteTemp);
-                remove(absoluteDirLost);
-                rename(absoluteTemp, absoluteDirLost);
+                remove_duplicated_lines(sp->udp_lostpkt_diagnostic_fname, sp->udp_outoforderpkt_diagnostic_fname, "tmpdiff.txt");
+                remove(sp->udp_lostpkt_diagnostic_fname);
+                rename("tmpdiff.txt", sp->udp_lostpkt_diagnostic_fname);
             }
-
-            /*
-            // prepare for comm 
-            if (ooosize != 0) {
-                sprintf(cmd, "sort %s | cat > %s", absoluteDirOOO, absoluteTemp);
-                if (system(cmd) != -1) {
-                    remove(absoluteDirOOO);
-                    rename(absoluteTemp, absoluteDirOOO);
-                }
-                else {
-                    printf("Failed to run %s\n", cmd);
-                }
-            }
-
-            if (missingsize != 0) {
-                sprintf(cmd, "sort %s | cat > %s", absoluteDirLost, absoluteTemp);
-                if (system(cmd) != -1) {
-                    remove(absoluteDirLost);
-                    rename(absoluteTemp, absoluteDirLost);
-                }
-                else {
-                    printf("Failed to run %s\n", cmd);
-                }
-            }        
-
-            if (ooosize != 0 && missingsize != 0) {
-                sprintf(cmd, "comm -23 %s %s > %s", absoluteDirLost, absoluteDirOOO, absoluteTemp);
-                if (system(cmd) > -1) {
-                    remove(absoluteDirLost);
-                    rename(absoluteTemp, absoluteDirLost);
-                }
-                else {
-                    printf("Failed to run %s\n", cmd);
-                }
-            }
-
-            // after comm is done, sort seq# in each list
-            if (ooosize != 0) {
-                sprintf(cmd, "sort -n %s | cat > %s", absoluteDirOOO, absoluteTemp);
-                if (system(cmd) != -1) {
-                    remove(absoluteDirOOO);
-                    rename(absoluteTemp, absoluteDirOOO);
-                }
-                else {
-                    printf("Failed to run %s\n", cmd);
-                }
-            }
-
-            if (missingsize != 0) {
-                sprintf(cmd, "sort -n %s | cat > %s", absoluteDirLost, absoluteTemp);
-                if (system(cmd) != -1) {
-                    remove(absoluteDirLost);
-                    rename(absoluteTemp, absoluteDirLost);
-                }
-                else {
-                    printf("Failed to run %s\n", cmd);
-                }
-            } 
-            */           
 
             int max_seqmsgcount_to_send = 500;
             char* strbuf = malloc((sizeof(uint64_t) + 2) * (max_seqmsgcount_to_send + 1));
