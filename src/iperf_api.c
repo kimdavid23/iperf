@@ -5055,7 +5055,7 @@ stop_diagnostic(struct iperf_stream *sp)
             struct stat st;
 
             stat(sp->udp_lostpkt_diagnostic_fname, &st);
-            missingsize = st.st_size;
+            // missingsize = st.st_size;
             
             stat(sp->udp_outoforderpkt_diagnostic_fname, &st);
             ooosize = st.st_size;
@@ -5479,7 +5479,7 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
             }
         }
         char snum[5];
-        sprintf(snum, "%"PRIu64"", i);
+        sprintf(snum, "%d", i);
         char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
         strcpy(tempFileName, outFileName);
         strcat(tempFileName, snum);
@@ -5528,7 +5528,7 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
                 strcat(tempFileName1, snum1);
 
                 char snum3[5];
-                sprintf(snum3, "%"PRIu64"", i);
+                sprintf(snum3, "%d", i);
                 char tempFileName2[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName2, "TEMP_SORTED_FILE");
                 strcat(tempFileName2, snum3);
@@ -5542,13 +5542,13 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             if (temp2 % 2)
             {
                 char snum[5];
-                sprintf(snum, "%"PRIu64"", temp2 - 1);
+                sprintf(snum, "%d", temp2 - 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
                 strcat(tempFileName, snum);
 
                 char snum1[5];
-                sprintf(snum1, "%"PRIu64"", temp2 / 2);
+                sprintf(snum1, "%d", temp2 / 2);
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName1, "TEMP_SORTED_FILE");
                 strcat(tempFileName1, snum1);
