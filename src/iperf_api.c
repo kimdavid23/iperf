@@ -5043,14 +5043,14 @@ stop_diagnostic(struct iperf_stream *sp)
             char absoluteDirOOO[1000];
             char absoluteDirLost[1000];
             char absoluteTemp[1000];
-            char cmd[5000];
+            // char cmd[5000];
 
             sprintf(absoluteDirOOO, "%s/%s", cwd, sp->udp_outoforderpkt_diagnostic_fname);
             sprintf(absoluteDirLost, "%s/%s", cwd, sp->udp_lostpkt_diagnostic_fname);
             sprintf(absoluteTemp, "%s/tmpdiff.txt", cwd);
 
             int ooosize = 0;
-            int missingsize = 0;
+            // int missingsize = 0;
 
             struct stat st;
 
@@ -5375,7 +5375,7 @@ void dup_remove_add(char *name, long long* currMaxSize, long long* fileByteCount
 
     if (*num >= *currMaxSize)
     {
-        long long temp = *currMaxSize;
+        // long long temp = *currMaxSize;
         *currMaxSize += incremental_size;
         dup_remove_strbuf = (char **)realloc(dup_remove_strbuf, *currMaxSize * sizeof(char *));
     }
@@ -5391,16 +5391,16 @@ void dup_remove_external_mergesort(char *file__1, char *file__2, char *file__out
     FILE *fileOut = fopen(file__out, "w+");
     bool FILE1_done = false;
     bool FILE2_done = false;
-    char tempStr[DUP_REMOVE_MAX_NAME_LEN];
+    // char tempStr[DUP_REMOVE_MAX_NAME_LEN];
     char tempStr1[DUP_REMOVE_MAX_NAME_LEN] = {'\0'};
     char tempStr2[DUP_REMOVE_MAX_NAME_LEN] = {'\0'};
     int access = DUP_REMOVE_FILE1;
-    int asa = 1;
+    // int asa = 1;
     fscanf(f2, "%s", tempStr2);
 
     while (!FILE1_done || !FILE2_done)
     {
-        char temp[DUP_REMOVE_MAX_NAME_LEN];
+        // char temp[DUP_REMOVE_MAX_NAME_LEN];
         int ff2 = (!FILE2_done && !access) ? fscanf(f2, "%s", tempStr2) : -3;
         int ff1 = (!FILE1_done && access) ? fscanf(f1, "%s", tempStr1) : -3;
 
@@ -5479,7 +5479,7 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
             }
         }
         char snum[5];
-        sprintf(snum, "%d", i);
+        sprintf(snum, "%"PRIu64"", i);
         char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
         strcpy(tempFileName, outFileName);
         strcat(tempFileName, snum);
@@ -5518,7 +5518,7 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             {
                 char snum[5];
                 sprintf(snum, "%d", 2 * i);
-                char snum1[5];
+                char snum1[5];  
                 sprintf(snum1, "%d", 2 * i + 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
@@ -5528,7 +5528,7 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
                 strcat(tempFileName1, snum1);
 
                 char snum3[5];
-                sprintf(snum3, "%d", i);
+                sprintf(snum3, "%"PRIu64"", i);
                 char tempFileName2[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName2, "TEMP_SORTED_FILE");
                 strcat(tempFileName2, snum3);
@@ -5542,13 +5542,13 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             if (temp2 % 2)
             {
                 char snum[5];
-                sprintf(snum, "%lld", temp2 - 1);
+                sprintf(snum, "%"PRIu64"", temp2 - 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
                 strcat(tempFileName, snum);
 
                 char snum1[5];
-                sprintf(snum1, "%lld", temp2 / 2);
+                sprintf(snum1, "%"PRIu64"", temp2 / 2);
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName1, "TEMP_SORTED_FILE");
                 strcat(tempFileName1, snum1);
