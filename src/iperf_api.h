@@ -346,9 +346,21 @@ void delete_diagnostic_files(struct iperf_stream *);
 void delete_file_from_current_dir(char *);
 void clear_diagnostic_filelist ();
 
+/* remove duplicated lines between string1 and string2 from string1 */
+#define DUP_REMOVE_MAX_NAME_LEN 110
+#define DUP_REMOVE_FILE1 1
+#define DUP_REMOVE_FILE2 0
+char **dup_remove_strbuf;
 
-
-
+void dup_remove_init();
+void dup_remove_add(char *name, long long* currMaxSize, long long* fileByteCounter, long long *num);
+int dup_remove_compare(const void *a, const void *b);
+void dup_remove_external_mergesort(char *file__1, char *file__2, char *file__out);
+void dup_remove_sort_file (char* fileIn, char* fileOut);
+long long dup_remove_get_filesize(char *fileName);
+void dup_remove_free_resources(long long *num);
+void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileSize, long long dup_remove_halfGB);
+int remove_duplicated_lines (char* filename1, char* filename2, char* outputFilename);
 
 
 /* Client routines. */

@@ -31,16 +31,11 @@
 #include "cjson.h"
 #include <sys/select.h>
 
-#define DUP_REMOVE_MAX_NAME_LEN 110
-#define DUP_REMOVE_FILE1 1
-#define DUP_REMOVE_FILE2 0
-char **dup_remove_strbuf;
-
 int readentropy(void *out, size_t outsize);
 
 void fill_with_repeating_pattern(void *out, size_t outsize);
 
-void make_cookie(const char *cookie);
+void make_cookie(char *);
 
 int is_closed(int);
 
@@ -59,17 +54,6 @@ const char* get_optional_features(void);
 cJSON* iperf_json_printf(const char *format, ...);
 
 void iperf_dump_fdset(FILE *fp, const char *str, int nfds, fd_set *fds);
-
-/* remove duplicated lines between string1 and string2 from string1 */
-void dup_remove_init();
-void dup_remove_add(char *name, long long* currMaxSize, long long* fileByteCounter, long long *num);
-int dup_remove_compare(const void *a, const void *b);
-void dup_remove_external_mergesort(char *file__1, char *file__2, char *file__out);
-void dup_remove_sort_file (char* fileIn, char* fileOut);
-long long dup_remove_get_filesize(char *fileName);
-void dup_remove_free_resources(long long *num);
-void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileSize, long long dup_remove_halfGB);
-int remove_duplicated_lines (char* filename1, char* filename2, char* outputFilename);
 
 #ifndef HAVE_DAEMON
 extern int daemon(int nochdir, int noclose);

@@ -5300,3 +5300,265 @@ void delete_file_from_current_dir(char *filename)
     sprintf(strBuf, "%s/%s", dir, filename);
     remove(strBuf);
 }
+
+
+int remove_duplicated_lines (char* file1, char* file2, char* outputFilename)
+{
+    FILE *fileptr1, *fileptr2, *outputFile;
+
+    char line1[100];
+    char line2[100];
+    char filename1 [100];
+    char filename2 [100];
+    
+	strcpy (filename1, "sorted1.tmp");
+	strcpy (filename2, "sorted2.tmp");    
+
+    dup_remove_sort_file (file1, filename1);
+    dup_remove_sort_file (file2, filename2);
+
+    fileptr1 = fopen(filename1, "r");
+    fileptr2 = fopen(filename2, "r");
+    outputFile = fopen(outputFilename, "w");
+
+    if (fileptr1 == NULL || fileptr2 == NULL || outputFile == NULL) {
+        return -1;
+    }
+
+    fgets(line1, sizeof(line1), fileptr1);
+    fgets(line2, sizeof(line2), fileptr2);
+
+    while (!feof(fileptr1) && !feof(fileptr2)) {
+        int cmp = atoi(line1) - atoi(line2);
+
+        if (cmp == 0) {
+            fgets(line1, sizeof(line1), fileptr1);
+            fgets(line2, sizeof(line2), fileptr2);
+        } else if (cmp < 0) {
+            fprintf(outputFile, "%s", line1);
+            fgets(line1, sizeof(line1), fileptr1);
+        } else {
+            fgets(line2, sizeof(line2), fileptr2);
+        }
+    }
+
+    while (!feof(fileptr1)) {
+        fprintf(outputFile, "%s", line1);        
+        fgets(line1, sizeof(line1), fileptr1);        
+    }
+
+    fclose(fileptr1);
+    fclose(fileptr2);
+    fclose(outputFile);
+
+    remove(filename1);
+    remove(filename2);
+
+    return 0;
+} 
+
+int dup_remove_compare(const void *a, const void *b)
+{
+    return atoi (*(const char **)a) - atoi (*(const char **)b);
+}
+
+void dup_remove_init()
+{
+    long long init_estimate = (1024 * 1024 * 128);
+    dup_remove_strbuf = (char **)malloc(init_estimate * sizeof(char *));
+}
+
+void dup_remove_add(char *name, long long* currMaxSize, long long* fileByteCounter, long long *num)
+{
+    long long incremental_size = (1024 * 1024 * 64);
+
+    if (*num >= *currMaxSize)
+    {
+        long long temp = *currMaxSize;
+        *currMaxSize += incremental_size;
+        dup_remove_strbuf = (char **)realloc(dup_remove_strbuf, *currMaxSize * sizeof(char *));
+    }
+    dup_remove_strbuf[*num] = (char *)malloc(strlen(name) + 1);
+    *fileByteCounter += strlen(name) + 1;
+    strcpy(dup_remove_strbuf[(*num)++], name);
+}
+
+void dup_remove_external_mergesort(char *file__1, char *file__2, char *file__out)
+{
+    FILE *f1 = fopen(file__1, "r");
+    FILE *f2 = fopen(file__2, "r");
+    FILE *fileOut = fopen(file__out, "w+");
+    bool FILE1_done = false;
+    bool FILE2_done = false;
+    char tempStr[DUP_REMOVE_MAX_NAME_LEN];
+    char tempStr1[DUP_REMOVE_MAX_NAME_LEN] = {'\0'};
+    char tempStr2[DUP_REMOVE_MAX_NAME_LEN] = {'\0'};
+    int access = DUP_REMOVE_FILE1;
+    int asa = 1;
+    fscanf(f2, "%s", tempStr2);
+
+    while (!FILE1_done || !FILE2_done)
+    {
+        char temp[DUP_REMOVE_MAX_NAME_LEN];
+        int ff2 = (!FILE2_done && !access) ? fscanf(f2, "%s", tempStr2) : -3;
+        int ff1 = (!FILE1_done && access) ? fscanf(f1, "%s", tempStr1) : -3;
+
+        if (ff1 == EOF)
+        {
+            FILE1_done = true;
+            access = DUP_REMOVE_FILE2;
+        }
+        if (ff2 == EOF)
+        {
+            FILE2_done = true;
+            access = DUP_REMOVE_FILE1;
+        }
+        if (!FILE1_done && FILE2_done)
+        {
+            fprintf(fileOut, "%s\n", tempStr1);
+            continue;
+        }
+        if (FILE1_done && !FILE2_done)
+        {
+            fprintf(fileOut, "%s\n", tempStr2);
+            continue;
+        }
+        if (!FILE1_done && !FILE2_done)
+        {
+            if (atoi(tempStr1) - atoi(tempStr2) < 0)
+            {
+                fprintf(fileOut, "%s\n", tempStr1);
+                access = DUP_REMOVE_FILE1;
+            }
+            else
+            {
+                fprintf(fileOut, "%s\n", tempStr2);
+                access = DUP_REMOVE_FILE2;
+            }
+        }
+    }
+    fclose(fileOut);
+}
+
+long long dup_remove_get_filesize(char *fileName)
+{
+    struct stat fileStatus;
+    if (stat(fileName, &fileStatus) < 0)
+        return -1;
+    return fileStatus.st_size;
+}
+
+void dup_remove_free_resources(long long *num)
+{
+    for (long long v = 0; v < *num; v++)
+        free(dup_remove_strbuf[v]);
+    free(dup_remove_strbuf);
+    *num = 0;
+}
+
+void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileSize, long long dup_remove_halfGB)
+{
+    char tmpname[DUP_REMOVE_MAX_NAME_LEN];
+    long long num_of_files = (fileSize + dup_remove_halfGB - 1) / dup_remove_halfGB;
+    long long currMaxSize = (1024 * 1024 * 128);
+    long long fileByteCounter = 0;
+    long long num = 0;
+
+    FILE *f1 = fopen(fileName, "r");
+    for (int i = 0; i < num_of_files; i++)
+    {
+        dup_remove_init();
+        while (fscanf(f1, "%s", tmpname) != EOF)
+        {
+            dup_remove_add(tmpname, &currMaxSize, &fileByteCounter, &num);
+            long long tttt = (long long)dup_remove_halfGB * (i + 1);
+            if (fileByteCounter >= tttt)
+            {
+                break;
+            }
+        }
+        char snum[5];
+        sprintf(snum, "%d", i);
+        char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
+        strcpy(tempFileName, outFileName);
+        strcat(tempFileName, snum);
+        FILE *f2 = fopen(tempFileName, "w+");
+
+        qsort(dup_remove_strbuf, num, sizeof(const char *), dup_remove_compare);
+
+        for (long long i = 0; i < num; i++)
+            fprintf(f2, "%s\n", dup_remove_strbuf[i]);
+        fclose(f2);
+        dup_remove_free_resources(&num);
+    }
+}
+
+void dup_remove_sort_file (char* fileIn, char* fileOut)
+{ 
+    long long fileSize = dup_remove_get_filesize(fileIn);
+    long long dup_remove_halfGB = 805306368;
+
+    if (fileSize <= dup_remove_halfGB)
+    {
+        dup_remove_sort_file_sub(fileIn, "OUTPUT_SORTED_FILE_FINAL", fileSize, dup_remove_halfGB);
+        rename("OUTPUT_SORTED_FILE_FINAL0", fileOut);
+    }
+    else if (fileSize > dup_remove_halfGB)
+    {
+        long long num_of_files = (fileSize + dup_remove_halfGB - 1) / dup_remove_halfGB;
+        dup_remove_sort_file_sub(fileIn, "TEMP_SORTED_FILE", fileSize, dup_remove_halfGB);
+
+        while (1)
+        {
+            long long temp = (num_of_files) / 2;
+            long long temp2 = num_of_files;
+            num_of_files = (num_of_files + 1) / 2;
+            for (int i = 0; i < temp; i++)
+            {
+                char snum[5];
+                sprintf(snum, "%d", 2 * i);
+                char snum1[5];
+                sprintf(snum1, "%d", 2 * i + 1);
+                char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
+                char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
+                strcpy(tempFileName, "TEMP_SORTED_FILE");
+                strcat(tempFileName, snum);
+                strcpy(tempFileName1, "TEMP_SORTED_FILE");
+                strcat(tempFileName1, snum1);
+
+                char snum3[5];
+                sprintf(snum3, "%d", i);
+                char tempFileName2[DUP_REMOVE_MAX_NAME_LEN];
+                strcpy(tempFileName2, "TEMP_SORTED_FILE");
+                strcat(tempFileName2, snum3);
+
+                dup_remove_external_mergesort(tempFileName, tempFileName1, "TEMP_MERGED_SORTED_FILE");
+                remove(tempFileName);
+                remove(tempFileName1);
+                rename("TEMP_MERGED_SORTED_FILE", tempFileName2);
+            }
+
+            if (temp2 % 2)
+            {
+                char snum[5];
+                sprintf(snum, "%lld", temp2 - 1);
+                char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
+                strcpy(tempFileName, "TEMP_SORTED_FILE");
+                strcat(tempFileName, snum);
+
+                char snum1[5];
+                sprintf(snum1, "%lld", temp2 / 2);
+                char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
+                strcpy(tempFileName1, "TEMP_SORTED_FILE");
+                strcat(tempFileName1, snum1);
+                rename(tempFileName, tempFileName1);
+            }
+            if (num_of_files == 1)
+            {
+                rename("TEMP_SORTED_FILE0", fileOut);
+                break;
+            }
+        }
+    }
+}
+
