@@ -350,7 +350,6 @@ void clear_diagnostic_filelist ();
 #define DUP_REMOVE_MAX_NAME_LEN 110
 #define DUP_REMOVE_FILE1 1
 #define DUP_REMOVE_FILE2 0
-char **dup_remove_strbuf;
 
 void dup_remove_init();
 void dup_remove_add(char *name, long long* currMaxSize, long long* fileByteCounter, long long *num);

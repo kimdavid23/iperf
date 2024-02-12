@@ -5302,6 +5302,7 @@ void delete_file_from_current_dir(char *filename)
     remove(strBuf);
 }
 
+char **dup_remove_strbuf;
 
 int remove_duplicated_lines (char* file1, char* file2, char* outputFilename)
 {
