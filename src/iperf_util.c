@@ -75,7 +75,7 @@ int readentropy(void *out, size_t outsize)
     }
     if (fread(out, 1, outsize, frandom) != outsize) {
         iperf_errexit(NULL, "error - failed to read %s: %s\n",
-                      rndfile,
+                      rndfile,  
                       feof(frandom) ? "EOF" : strerror(errno));
     }
     return 0;
@@ -373,8 +373,7 @@ void fill_with_repeating_pattern(void *out, size_t outsize)
  * Assumes cookie has size (COOKIE_SIZE + 1) char's.
  */
 
-void
-make_cookie(const char *cookie)
+void make_cookie(const char *cookie)
 {
     unsigned char *out = (unsigned char*)cookie;
     size_t pos;
