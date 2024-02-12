@@ -5480,7 +5480,7 @@ void dup_remove_sort_file_sub(char *fileName, char *outFileName, long long fileS
             }
         }
         char snum[5];
-        sprintf(snum, "%d", i);
+        sprintf(snum, "%d", (int) i);
         char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
         strcpy(tempFileName, outFileName);
         strcat(tempFileName, snum);
@@ -5518,9 +5518,9 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             for (int i = 0; i < temp; i++)
             {
                 char snum[5];
-                sprintf(snum, "%d", 2 * i);
+                sprintf(snum, "%d", (int) 2 * i);
                 char snum1[5];  
-                sprintf(snum1, "%d", 2 * i + 1);
+                sprintf(snum1, "%d", (int) 2 * i + 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
@@ -5529,7 +5529,7 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
                 strcat(tempFileName1, snum1);
 
                 char snum3[5];
-                sprintf(snum3, "%d", i);
+                sprintf(snum3, "%d", (int) i);
                 char tempFileName2[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName2, "TEMP_SORTED_FILE");
                 strcat(tempFileName2, snum3);
@@ -5543,13 +5543,13 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             if (temp2 % 2)
             {
                 char snum[5];
-                sprintf(snum, "%d", temp2 - 1);
+                sprintf(snum, "%"PRIu64", temp2 - 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
                 strcat(tempFileName, snum);
 
                 char snum1[5];
-                sprintf(snum1, "%d", temp2 / 2);
+                sprintf(snum1, "%"PRIu64", temp2 / 2);
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName1, "TEMP_SORTED_FILE");
                 strcat(tempFileName1, snum1);
