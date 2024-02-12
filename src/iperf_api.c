@@ -5059,6 +5059,13 @@ stop_diagnostic(struct iperf_stream *sp)
             stat(sp->udp_outoforderpkt_diagnostic_fname, &st);
             ooosize = st.st_size;
 
+            if (ooosize != 0) {
+                remove_duplicated_lines(absoluteDirLost, absoluteDirOOO, absoluteTemp);
+                remove(absoluteDirLost);
+                rename(absoluteTemp, absoluteDirLost);
+            }
+
+            /*
             // prepare for comm 
             if (ooosize != 0) {
                 sprintf(cmd, "sort %s | cat > %s", absoluteDirOOO, absoluteTemp);
@@ -5115,7 +5122,7 @@ stop_diagnostic(struct iperf_stream *sp)
                     printf("Failed to run %s\n", cmd);
                 }
             } 
-           
+            */           
 
             int max_seqmsgcount_to_send = 500;
             char* strbuf = malloc((sizeof(uint64_t) + 2) * (max_seqmsgcount_to_send + 1));

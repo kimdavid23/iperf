@@ -346,6 +346,11 @@ void delete_diagnostic_files(struct iperf_stream *);
 void delete_file_from_current_dir(char *);
 void clear_diagnostic_filelist ();
 
+
+
+
+
+
 /* Client routines. */
 int iperf_run_client(struct iperf_test *);
 int iperf_connect(struct iperf_test *);
