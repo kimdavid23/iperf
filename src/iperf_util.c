@@ -51,6 +51,7 @@
 #include "cjson.h"
 #include "iperf.h"
 #include "iperf_api.h"
+#include "iperf_util.h"
 
 /*
  * Read entropy from /dev/urandom
