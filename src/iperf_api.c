@@ -5543,13 +5543,13 @@ void dup_remove_sort_file (char* fileIn, char* fileOut)
             if (temp2 % 2)
             {
                 char snum[5];
-                sprintf(snum, "%d", temp2 - 1);
+                sprintf(snum, "%lld", temp2 - 1);
                 char tempFileName[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName, "TEMP_SORTED_FILE");
                 strcat(tempFileName, snum);
 
                 char snum1[5];
-                sprintf(snum1, "%d", temp2 / 2);
+                sprintf(snum1, "%lld", temp2 / 2);
                 char tempFileName1[DUP_REMOVE_MAX_NAME_LEN];
                 strcpy(tempFileName1, "TEMP_SORTED_FILE");
                 strcat(tempFileName1, snum1);
