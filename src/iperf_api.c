@@ -5027,6 +5027,7 @@ begin_diagnostic(struct iperf_stream *sp)
             sp->udp_lostpkt_diagnostic_fp = fopen(sp->udp_lostpkt_diagnostic_fname, "w+");  
         }
     }
+    printf ("stop begin_diagnostic\n");
 }
 
 void 
@@ -5118,7 +5119,8 @@ stop_diagnostic(struct iperf_stream *sp)
                 fclose (udp_lostpkt_diagnostic_filelist_fp);
             } 
         } 
-    }    
+    } 
+    printf ("end stop_diagnostic\n");   
 }
 
 void
