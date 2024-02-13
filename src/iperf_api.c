@@ -5012,6 +5012,8 @@ void clear_diagnostic_filelist ()
 void 
 begin_diagnostic(struct iperf_stream *sp)
 {
+    printf ("start begin_diagnostic\n");
+
     if (sp->sender == 0) {
         if (sp->test->role == 's' || (sp->test->role == 'c' &&  sp->test->clientside_e2e_diagnostic == 1)) {
             /* File to store all packet seq# gap and OutOrderPackets */
@@ -5030,42 +5032,24 @@ begin_diagnostic(struct iperf_stream *sp)
 void 
 stop_diagnostic(struct iperf_stream *sp)
 {
+    printf ("start stop_diagnostic\n");
+
     if (sp->sender == 0) {
         if (sp->test->role == 's'  || (sp->test->role == 'c' &&  sp->test->clientside_e2e_diagnostic == 1)) {
             fclose(sp->udp_outoforderpkt_diagnostic_fp);
             fclose(sp->udp_lostpkt_diagnostic_fp);
 
-            char cwd[500];
-            if (getcwd(cwd, sizeof(cwd)) == NULL) {
-                printf("getcwd has been failed\n");
-            }
+            struct stat stooo;
+            stat(sp->udp_lostpkt_diagnostic_fname, &stooo);           
+            int ooosize = stooo.st_size;
 
-            char absoluteDirOOO[1000];
-            char absoluteDirLost[1000];
-            char absoluteTemp[1000];
-            // char cmd[5000];
-
-            sprintf(absoluteDirOOO, "%s/%s", cwd, sp->udp_outoforderpkt_diagnostic_fname);
-            sprintf(absoluteDirLost, "%s/%s", cwd, sp->udp_lostpkt_diagnostic_fname);
-            sprintf(absoluteTemp, "%s/tmpdiff.txt", cwd);
-
-            int ooosize = 0;
-            // int missingsize = 0;
-
-            struct stat st;
-
-            stat(sp->udp_lostpkt_diagnostic_fname, &st);
-            // missingsize = st.st_size;
-            
-            stat(sp->udp_outoforderpkt_diagnostic_fname, &st);
-            ooosize = st.st_size;
-
-            printf ("hello world\n");
+            char filename_tmpdiff [200];
+            sprintf (filename_tmpdiff, "tmpdiff%02d.txt", sp->id);
 
             if (ooosize != 0) {
-                remove_duplicated_lines(sp->udp_lostpkt_diagnostic_fname, sp->udp_outoforderpkt_diagnostic_fname, "tmpdiff.txt");
+                remove_duplicated_lines(sp->udp_lostpkt_diagnostic_fname, sp->udp_outoforderpkt_diagnostic_fname, filename_tmpdiff);
                 remove(sp->udp_lostpkt_diagnostic_fname);
-                rename("tmpdiff.txt", sp->udp_lostpkt_diagnostic_fname);
+                rename(filename_tmpdiff, sp->udp_lostpkt_diagnostic_fname);
             }
 
             int max_seqmsgcount_to_send = 500;
