@@ -5012,8 +5012,6 @@ void clear_diagnostic_filelist ()
 void 
 begin_diagnostic(struct iperf_stream *sp)
 {
-    printf ("start begin_diagnostic\n");
-
     if (sp->sender == 0) {
         if (sp->test->role == 's' || (sp->test->role == 'c' &&  sp->test->clientside_e2e_diagnostic == 1)) {
             /* File to store all packet seq# gap and OutOrderPackets */
@@ -5027,14 +5025,11 @@ begin_diagnostic(struct iperf_stream *sp)
             sp->udp_lostpkt_diagnostic_fp = fopen(sp->udp_lostpkt_diagnostic_fname, "w+");  
         }
     }
-    printf ("stop begin_diagnostic\n");
 }
 
 void 
 stop_diagnostic(struct iperf_stream *sp)
 {
-    printf ("start stop_diagnostic\n");
-
     if (sp->sender == 0) {
         if (sp->test->role == 's'  || (sp->test->role == 'c' &&  sp->test->clientside_e2e_diagnostic == 1)) {
             fclose(sp->udp_outoforderpkt_diagnostic_fp);
@@ -5119,8 +5114,7 @@ stop_diagnostic(struct iperf_stream *sp)
                 fclose (udp_lostpkt_diagnostic_filelist_fp);
             } 
         } 
-    } 
-    printf ("end stop_diagnostic\n");   
+    }
 }
 
 void
