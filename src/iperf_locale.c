@@ -206,7 +206,8 @@ const char usage_longstr[] = "Usage: iperf3 [-s|-c host] [options]\n"
                            "  -L, --flowlabel N         set the IPv6 flow label (only supported on Linux)\n"
 #endif /* HAVE_FLOWLABEL */
                            "  -Z, --zerocopy            use a 'zero copy' method of sending data\n"
-                           "  -O, --omit N              perform pre-test for N seconds and omit the pre-test statistics\n"
+                           "  -W, --wait N              wait n seconds before starting to send packets\n"
+                           "  -O, --omit N              omit the first n seconds\n"
                            "  -T, --title str           prefix every output line with this string\n"
                            "  --extra-data str          data string to include in client and server JSON\n"
                            "  --get-server-output       get results from server\n"
@@ -296,7 +297,7 @@ const char wait_server_threads[] =
 "Waiting for server threads to complete. Interrupt again to force quit.\n";
 
 const char test_start_time[] =
-"Starting Test: protocol: %s, %d streams, %d byte blocks, omitting %d seconds, %d second test, tos %d\n";
+"Starting Test: protocol: %s, %d streams, %d byte blocks, waiting %d omitting %d seconds, %d second test, tos %d\n";
 
 const char test_start_bytes[] =
 "Starting Test: protocol: %s, %d streams, %d byte blocks, omitting %d seconds, %llu bytes to send, tos %d\n";
@@ -341,6 +342,9 @@ const char report_autotune[] =
 
 const char report_omit_done[] =
 "Finished omit period, starting real test\n";
+
+const char report_wait_done[] =
+"Finished wait period, starting real test\n";
 
 const char report_diskfile[] =
 "        Sent %s / %s (%d%%) of %s\n";

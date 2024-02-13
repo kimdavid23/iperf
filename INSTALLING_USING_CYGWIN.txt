@@ -1,0 +1,28 @@
+Cygwin installation
+-------------------
+# install cygwin for Windows from https://www.cygwin.com/
+# Select View->Category
+# In category 'Devel' change 'Default' to 'Install'
+# Install Cygwin
+
+Getting the iperf3 source code
+------------------------------
+# Open Cygwin command shell
+# configure git for Unix line ending 
+git config --global core.autocrlf input
+
+# get the iperf3 source code
+git clone https://github.com/rossro/iperf.git
+
+# compile the source code
+cd iperf
+./configure
+make
+make install
+
+# Copy iperf3.exe and cygwin1.dll to the same directory e.g. iperf3 folder within the Documents folder for user YOURUSER
+mkdir /cygdrive/c/Users/YOURUSER/Documents/iperf3
+cp /usr/local/bin/iperf3.exe /cygdrive/c/Users/YOURUSER/Documents/iperf3
+cp /bin/cygwin1.dll /cygdrive/c/Users/YOURUSER/Documents/iperf3
+
+ 

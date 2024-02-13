@@ -154,6 +154,12 @@ iperf_get_test_omit(struct iperf_test *ipt)
 }
 
 int
+iperf_get_test_wait(struct iperf_test *ipt)
+{
+    return ipt->wait;
+}
+
+int
 iperf_get_test_duration(struct iperf_test *ipt)
 {
     return ipt->duration;
@@ -454,6 +460,12 @@ void
 iperf_set_test_omit(struct iperf_test *ipt, int omit)
 {
     ipt->omit = omit;
+}
+
+void
+iperf_set_test_wait(struct iperf_test *ipt, int wait)
+{
+    ipt->wait = wait;
 }
 
 void
@@ -882,15 +894,15 @@ void
 iperf_on_test_start(struct iperf_test *test)
 {
     if (test->json_output) {
-	cJSON_AddItemToObject(test->json_start, "test_start", iperf_json_printf("protocol: %s  num_streams: %d  blksize: %d  omit: %d  duration: %d  bytes: %d  blocks: %d  reverse: %d  tos: %d  target_bitrate: %d bidir: %d fqrate: %d", test->protocol->name, (int64_t) test->num_streams, (int64_t) test->settings->blksize, (int64_t) test->omit, (int64_t) test->duration, (int64_t) test->settings->bytes, (int64_t) test->settings->blocks, test->reverse?(int64_t)1:(int64_t)0, (int64_t) test->settings->tos, (int64_t) test->settings->rate, (int64_t) test->bidirectional, (uint64_t) test->settings->fqrate));
+	cJSON_AddItemToObject(test->json_start, "test_start", iperf_json_printf("protocol: %s  num_streams: %d  blksize: %d  wait %d omit: %d  duration: %d  bytes: %d  blocks: %d  reverse: %d  tos: %d  target_bitrate: %d bidir: %d fqrate: %d", test->protocol->name, (int64_t) test->num_streams, (int64_t) test->settings->blksize, (int64_t) test->wait, (int64_t) test->omit, (int64_t) test->duration, (int64_t) test->settings->bytes, (int64_t) test->settings->blocks, test->reverse?(int64_t)1:(int64_t)0, (int64_t) test->settings->tos, (int64_t) test->settings->rate, (int64_t) test->bidirectional, (uint64_t) test->settings->fqrate));
     } else {
 	if (test->verbose) {
 	    if (test->settings->bytes)
-		iperf_printf(test, test_start_bytes, test->protocol->name, test->num_streams, test->settings->blksize, test->omit, test->settings->bytes, test->settings->tos);
+		iperf_printf(test, test_start_bytes, test->protocol->name, test->num_streams, test->settings->blksize, test->wait, test->omit, test->settings->bytes, test->settings->tos);
 	    else if (test->settings->blocks)
-		iperf_printf(test, test_start_blocks, test->protocol->name, test->num_streams, test->settings->blksize, test->omit, test->settings->blocks, test->settings->tos);
+		iperf_printf(test, test_start_blocks, test->protocol->name, test->num_streams, test->settings->blksize, test->wait, test->omit, test->settings->blocks, test->settings->tos);
 	    else
-		iperf_printf(test, test_start_time, test->protocol->name, test->num_streams, test->settings->blksize, test->omit, test->duration, test->settings->tos);
+		iperf_printf(test, test_start_time, test->protocol->name, test->num_streams, test->settings->blksize, test->wait, test->omit, test->duration, test->settings->tos);
 	}
     }
 }
@@ -1091,6 +1103,7 @@ iperf_parse_arguments(struct iperf_test *test, int argc, char **argv)
         {"flowlabel", required_argument, NULL, 'L'},
 #endif /* HAVE_FLOWLABEL */
         {"zerocopy", no_argument, NULL, 'Z'},
+        {"wait", required_argument, NULL, 'W'},
         {"omit", required_argument, NULL, 'O'},
         {"file", required_argument, NULL, 'F'},
         {"repeating-payload", no_argument, NULL, OPT_REPEATING_PAYLOAD},
@@ -1154,7 +1167,7 @@ iperf_parse_arguments(struct iperf_test *test, int argc, char **argv)
     char *client_username = NULL, *client_rsa_public_key = NULL, *server_rsa_private_key = NULL;
 #endif /* HAVE_SSL */
 
-    while ((flag = getopt_long(argc, argv, "p:f:i:D1VJvsc:ub:t:n:k:l:P:Rw:B:M:N46S:L:ZO:F:A:T:C:dI:hX:q:", longopts, NULL)) != -1) {
+    while ((flag = getopt_long(argc, argv, "p:f:i:D1VJvsc:ub:t:n:k:l:P:Rw:B:M:N46S:L:ZW:O:F:A:T:C:dI:hX:q:", longopts, NULL)) != -1) {
         switch (flag) {
             case 'p':
 		portno = atoi(optarg);
@@ -1469,6 +1482,14 @@ iperf_parse_arguments(struct iperf_test *test, int argc, char **argv)
 		else {
 		    iperf_set_test_timestamp_format(test, TIMESTAMP_FORMAT);
 		}
+                break;
+            case 'W':
+                test->wait = atoi(optarg);
+                if (test->wait < 0 || test->wait > 60) {
+                    i_errno = IEOMIT;
+                    return -1;
+                }
+		client_flag = 1;
                 break;
             case 'O':
                 test->omit = atoi(optarg);
@@ -1802,6 +1823,7 @@ iperf_parse_arguments(struct iperf_test *test, int argc, char **argv)
         warning("Debug output (-d) may interfere with JSON output (-J)");
     }
 
+	test->omit += test->wait;
     return 0;
 }
 
@@ -1909,6 +1931,15 @@ iperf_send(struct iperf_test *test, fd_set *write_setP)
     struct iperf_time now;
     int no_throttle_check;
 
+    if(test->waiting)
+	{
+		if (test->debug) {
+			printf("Waiting 1 sec ...\n");
+		}
+		sleep(1);
+		return 0;
+	}
+	
     /* Can we do multisend mode? */
     if (test->settings->burst != 0)
         multisend = test->settings->burst;
@@ -2186,6 +2217,7 @@ send_parameters(struct iperf_test *test)
 	    cJSON_AddTrueToObject(j, "udp");
         else if (test->protocol->id == Psctp)
             cJSON_AddTrueToObject(j, "sctp");
+	cJSON_AddNumberToObject(j, "wait", test->wait);
 	cJSON_AddNumberToObject(j, "omit", test->omit);
 	if (test->server_affinity != -1)
 	    cJSON_AddNumberToObject(j, "server_affinity", test->server_affinity);
@@ -2295,6 +2327,8 @@ get_parameters(struct iperf_test *test)
 	    set_protocol(test, Pudp);
         if ((j_p = cJSON_GetObjectItem(j, "sctp")) != NULL)
             set_protocol(test, Psctp);
+	if ((j_p = cJSON_GetObjectItem(j, "wait")) != NULL)
+	    test->wait = j_p->valueint;
 	if ((j_p = cJSON_GetObjectItem(j, "omit")) != NULL)
 	    test->omit = j_p->valueint;
 	if ((j_p = cJSON_GetObjectItem(j, "server_affinity")) != NULL)
@@ -2890,6 +2924,7 @@ iperf_defaults(struct iperf_test *testp)
     struct protocol *sctp;
 #endif /* HAVE_SCTP_H */
 
+    testp->wait = 0;
     testp->omit = OMIT;
     testp->duration = DURATION;
     testp->diskfile_name = (char*) 0;
@@ -3073,6 +3108,8 @@ iperf_free_test(struct iperf_test *test)
 	free(test->remote_congestion_used);
     if (test->timestamp_format)
 	free(test->timestamp_format);
+    if (test->wait_timer != NULL)
+	tmr_cancel(test->wait_timer);
     if (test->omit_timer != NULL)
 	tmr_cancel(test->omit_timer);
     if (test->timer != NULL)
@@ -3152,6 +3189,10 @@ iperf_reset_test(struct iperf_test *test)
         SLIST_REMOVE_HEAD(&test->streams, streams);
         iperf_free_stream(sp);
     }
+    if (test->wait_timer != NULL) {
+	tmr_cancel(test->wait_timer);
+	test->wait_timer = NULL;
+    }
     if (test->omit_timer != NULL) {
 	tmr_cancel(test->omit_timer);
 	test->omit_timer = NULL;
@@ -3179,6 +3220,7 @@ iperf_reset_test(struct iperf_test *test)
     test->mode = RECEIVER;
     test->sender_has_retransmits = 0;
     set_protocol(test, Ptcp);
+    test->wait = 0;
     test->omit = OMIT;
     test->duration = DURATION;
     test->server_affinity = -1;
