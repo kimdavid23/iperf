@@ -405,20 +405,29 @@ iperf_udp_accept(struct iperf_test *test)
      */
     len = sizeof(sa_peer);
     if ((sz = recvfrom(test->prot_listener, &buf, sizeof(buf), 0, (struct sockaddr *) &sa_peer, &len)) < 0) {
+		fprintf(stderr, "iperf_udp_accept:  recvfrom failed with value %d", sz);
         i_errno = IESTREAMACCEPT;
         return -1;
     }
 
+	if (test->debug) {
+		printf("iperf_udp_accept: received %d\n", buf);
+	}
+
     if (connect(s, (struct sockaddr *) &sa_peer, len) < 0) {
+		fprintf(stderr, "iperf_udp_accept:  connect failed");
         i_errno = IESTREAMACCEPT;
         return -1;
     }
 
     /* Check and set socket buffer sizes */
     rc = iperf_udp_buffercheck(test, s);
-    if (rc < 0)
-	/* error */
-	return rc;
+	if (rc < 0)
+	{
+		fprintf(stderr, "iperf_udp_accept:  iperf_udp_buffercheck #1 failed with value %d", rc);
+		/* error */
+		return rc;
+	}
     /*
      * If the socket buffer was too small, but it was the default
      * size, then try explicitly setting it to something larger.
@@ -433,7 +442,10 @@ iperf_udp_accept(struct iperf_test *test)
 	    test->settings->socket_bufsize = bufsize;
 	    rc = iperf_udp_buffercheck(test, s);
 	    if (rc < 0)
-		return rc;
+		{
+			fprintf(stderr, "iperf_udp_accept:  iperf_udp_buffercheck #2 failed with value %d", rc);
+			return rc;
+		}
 	}
     }
 
@@ -464,8 +476,17 @@ iperf_udp_accept(struct iperf_test *test)
     /*
      * Create a new "listening" socket to replace the one we were using before.
      */
-    test->prot_listener = netannounce(test->settings->domain, Pudp, test->bind_address, test->bind_dev, test->server_port);
+	/*
+	* increase the port number for each connection and send it to the client
+	*/
+	buf = test->server_port + test->streams_accepted + 1;
+	if (test->debug) {
+		printf("Announce next port %d\n", buf);
+	}
+	test->prot_listener = netannounce(test->settings->domain, Pudp, test->bind_address, test->bind_dev, buf);
+
     if (test->prot_listener < 0) {
+		fprintf(stderr, "iperf_udp_accept:  netannounce failed with value %d", test->prot_listener);
         i_errno = IESTREAMLISTEN;
         return -1;
     }
@@ -474,12 +495,14 @@ iperf_udp_accept(struct iperf_test *test)
     test->max_fd = (test->max_fd < test->prot_listener) ? test->prot_listener : test->max_fd;
 
     /* Let the client know we're ready "accept" another UDP "stream" */
-    buf = UDP_CONNECT_REPLY;
-    if (write(s, &buf, sizeof(buf)) < 0) {
+	if (test->debug) {
+		printf("Writing next port %d\n", buf);
+	}
+	if (write(s, &buf, sizeof(buf)) < 0) {
+		fprintf(stderr, "iperf_udp_accept:  write failed");
         i_errno = IESTREAMWRITE;
         return -1;
     }
-
     return s;
 }
 
@@ -525,17 +548,25 @@ iperf_udp_connect(struct iperf_test *test)
     int i, max_len_wait_for_reply;
 
     /* Create and bind our local socket. */
+	if (test->debug) {
+		printf("Connecting to server_port %d\n", test->server_port);
+	}
+
     if ((s = netdial(test->settings->domain, Pudp, test->bind_address, test->bind_dev, test->bind_port, test->server_hostname, test->server_port, -1)) < 0) {
-        i_errno = IESTREAMCONNECT;
+		fprintf(stderr, "iperf_udp_connect:  netdial failed with value %d", s);
+		i_errno = IESTREAMCONNECT;
         return -1;
     }
 
     /* Check and set socket buffer sizes */
     rc = iperf_udp_buffercheck(test, s);
     if (rc < 0)
-	/* error */
-	return rc;
-    /*
+	{
+		fprintf(stderr, "iperf_udp_connect:  iperf_udp_buffercheck #1 failed with value %d", rc);
+		/* error */
+		return rc;
+	}
+	/*
      * If the socket buffer was too small, but it was the default
      * size, then try explicitly setting it to something larger.
      */
@@ -549,7 +580,10 @@ iperf_udp_connect(struct iperf_test *test)
 	    test->settings->socket_bufsize = bufsize;
 	    rc = iperf_udp_buffercheck(test, s);
 	    if (rc < 0)
-		return rc;
+		{
+			fprintf(stderr, "iperf_udp_connect:  iperf_udp_buffercheck #1 failed with value %d", rc);
+			return rc;
+		}
 	}
     }
 
@@ -591,12 +625,13 @@ iperf_udp_connect(struct iperf_test *test)
      * Write a datagram to the UDP stream to let the server know we're here.
      * The server learns our address by obtaining its peer's address.
      */
-    buf = UDP_CONNECT_MSG;
-    if (test->debug) {
-        printf("Sending Connect message to Socket %d\n", s);
-    }
-    if (write(s, &buf, sizeof(buf)) < 0) {
-        // XXX: Should this be changed to IESTREAMCONNECT?
+    buf = 123456789;		/* this can be pretty much anything */
+	if (test->debug) {
+		printf("Writing %d to socket\n", buf);
+	}
+	if (write(s, &buf, sizeof(buf)) < 0) {
+		fprintf(stderr, "iperf_udp_connect:  write failed");
+        // XXX: Should this be changed to IESTREAMCONNECT? 
         i_errno = IESTREAMWRITE;
         return -1;
     }
@@ -604,25 +639,27 @@ iperf_udp_connect(struct iperf_test *test)
     /*
      * Wait until the server replies back to us with the "accept" response.
      */
-    i = 0;
-    max_len_wait_for_reply = sizeof(buf);
-    if (test->reverse) /* In reverse mode allow few packets to have the "accept" response - to handle out of order packets */
-        max_len_wait_for_reply += MAX_REVERSE_OUT_OF_ORDER_PACKETS * test->settings->blksize;
-    do {
-        if ((sz = recv(s, &buf, sizeof(buf), 0)) < 0) {
-            i_errno = IESTREAMREAD;
-            return -1;
-        }
-        if (test->debug) {
-            printf("Connect received for Socket %d, sz=%d, buf=%x, i=%d, max_len_wait_for_reply=%d\n", s, sz, buf, i, max_len_wait_for_reply);
-        }
-        i += sz;
-    } while (buf != UDP_CONNECT_REPLY && buf != LEGACY_UDP_CONNECT_REPLY && i < max_len_wait_for_reply);
-
-    if (buf != UDP_CONNECT_REPLY  && buf != LEGACY_UDP_CONNECT_REPLY) {
+    if ((sz = recv(s, &buf, sizeof(buf), 0)) < 0) {
+		fprintf(stderr, "iperf_udp_connect:  recv failed with value %d", sz);
         i_errno = IESTREAMREAD;
         return -1;
     }
+	
+	if (test->debug) {
+		printf("Received %d from socket\n", buf);
+	}
+
+
+	/*
+	* If the recived value is a valid port number, use it as the next connection port
+	*/
+	if (buf <= 65535) {
+		test->server_port = buf;
+		if (test->debug) {
+			printf("Setting next server_port to %d\n", test->server_port);
+		}
+	}
+
 
     return s;
 }

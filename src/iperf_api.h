@@ -115,6 +115,7 @@ typedef uint64_t iperf_size_t;
 /* Getter routines for some fields inside iperf_test. */
 int	iperf_get_verbose( struct iperf_test* ipt );
 int	iperf_get_control_socket( struct iperf_test* ipt );
+int	iperf_get_test_wait( struct iperf_test* ipt );
 int	iperf_get_test_omit( struct iperf_test* ipt );
 int	iperf_get_test_duration( struct iperf_test* ipt );
 char	iperf_get_test_role( struct iperf_test* ipt );
@@ -161,6 +162,7 @@ int     iperf_get_mapped_v4(struct iperf_test* ipt);
 /* Setter routines for some fields inside iperf_test. */
 void	iperf_set_verbose( struct iperf_test* ipt, int verbose );
 void	iperf_set_control_socket( struct iperf_test* ipt, int ctrl_sck );
+void	iperf_set_test_wait( struct iperf_test* ipt, int wait );
 void	iperf_set_test_omit( struct iperf_test* ipt, int omit );
 void	iperf_set_test_duration( struct iperf_test* ipt, int duration );
 void	iperf_set_test_reporter_interval( struct iperf_test* ipt, double reporter_interval );
