@@ -5069,6 +5069,25 @@ begin_diagnostic(struct iperf_stream *sp)
     }
 }
 
+int count_lines(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return -1;
+    }
+
+    int lines = 0;
+    char ch;
+    while ((ch = fgetc(file)) != EOF) {
+        if (ch == '\n') {
+            lines++;
+        }
+    }
+
+    fclose(file);
+    return lines;
+}
+
 void 
 stop_diagnostic(struct iperf_stream *sp)
 {
@@ -5077,9 +5096,7 @@ stop_diagnostic(struct iperf_stream *sp)
             fclose(sp->udp_outoforderpkt_diagnostic_fp);
             fclose(sp->udp_lostpkt_diagnostic_fp);
 
-            struct stat stooo;
-            stat(sp->udp_lostpkt_diagnostic_fname, &stooo);           
-            int ooosize = stooo.st_size;
+            int ooosize = count_lines(sp->udp_outoforderpkt_diagnostic_fname);
 
             char filename_tmpdiff [200];
             sprintf (filename_tmpdiff, "tmpdiff%02d.txt", sp->id);
